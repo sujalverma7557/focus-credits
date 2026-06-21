@@ -8,8 +8,5 @@ export const DEFAULT_RATIO = {
 export const BLOCKED_SITES = [
   "instagram.com",
   "youtube.com",
-  "reddit.com",
   "facebook.com",
-  "x.com",
-  "twitter.com",
 ];

@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { getRemainingSeconds } from "../shared/time";
 import { useFocusStore } from "../store/focusStore";
 import { useCreditsStore } from "../store/creditsStore";
+import { isSessionComplete } from "../shared/time";
 
 export default function Popup() {
   const {
     session,
     startSession,
     endSession,
+    completeSession,
     loadSession,
   } = useFocusStore();
 
@@ -32,9 +34,17 @@ export default function Popup() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setRemaining(
-        getRemainingSeconds(session)
-      );
+      const seconds =
+        getRemainingSeconds(session);
+  
+      setRemaining(seconds);
+  
+      if (
+        session.isRunning &&
+        isSessionComplete(session)
+      ) {
+        completeSession();
+      }
     }, 1000);
   
     return () => clearInterval(interval);

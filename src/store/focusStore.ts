@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { storage } from "../services/storage";
 import type { FocusSession } from "../types/focus";
+import { useCreditsStore } from "./creditsStore";
 
 interface FocusStore {
   session: FocusSession;
@@ -24,7 +25,7 @@ const defaultSession: FocusSession = {
 };
 
 export const useFocusStore =
-  create<FocusStore>((set) => ({
+  create<FocusStore>((set, get) => ({
     session: defaultSession,
 
     startSession: async (
@@ -56,6 +57,23 @@ export const useFocusStore =
     },
 
     completeSession: async () => {
+        const { session } = get();
+      
+        if (
+          !session.isRunning ||
+          session.creditsAwarded
+        ) {
+          return;
+        }
+      
+        const rewardMinutes = Math.floor(
+          session.durationMinutes! / 4
+        );
+      
+        useCreditsStore
+          .getState()
+          .addCredits(rewardMinutes);
+      
         await storage.remove(
           "focusSession"
         );
