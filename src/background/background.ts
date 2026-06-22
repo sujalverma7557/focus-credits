@@ -32,8 +32,11 @@ chrome.tabs.onUpdated.addListener(
         ).availableCredits ?? 0;
 
         if (credits <= 0) {
+          const blockPageUrl =
+            chrome.runtime.getURL("block.html");
+
           chrome.tabs.update(tabId, {
-            url: "https://google.com",
+            url: blockPageUrl,
           });
         }
     }

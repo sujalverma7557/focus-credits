@@ -27,7 +27,14 @@ export const manifest: ManifestV3Export = {
   background: {
     service_worker: "src/background/background.ts",
     type: "module"
-  }
+  },
+  
+  web_accessible_resources: [
+    {
+      resources: ["block.html"],
+      matches: ["<all_urls>"],
+    },
+  ],
 };
 
 export default manifest;
