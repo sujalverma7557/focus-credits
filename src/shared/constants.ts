@@ -10,3 +10,6 @@ export const BLOCKED_SITES = [
   "youtube.com",
   "facebook.com",
 ];
+
+export const SOCIAL_SESSION_KEY =
+  "activeSocialSession";
