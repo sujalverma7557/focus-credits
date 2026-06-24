@@ -1,4 +1,8 @@
 import {BLOCKED_SITES, SOCIAL_SESSION_KEY} from "../shared/constants";
+import { getRemainingCredits } from "../shared/credits";
+
+const CREDIT_CHECK_ALARM =
+  "creditCheck";
 
 
 async function endSocialSession() {
@@ -18,19 +22,8 @@ async function endSocialSession() {
     session
   );
 
-  const elapsedMinutes =
-    Math.floor(
-      (Date.now() -
-        session.startTime) /
-        60000
-    );
-
   const remainingCredits =
-    Math.max(
-      0,
-      session.creditsAtStart -
-        elapsedMinutes
-    );
+  getRemainingCredits(session);
 
   await chrome.storage.local.set({
     availableCredits:
@@ -41,10 +34,10 @@ async function endSocialSession() {
     SOCIAL_SESSION_KEY
   );
 
-  console.log(
-    "Spent minutes:",
-    elapsedMinutes
+  await chrome.alarms.clear(
+    CREDIT_CHECK_ALARM
   );
+
 
   console.log(
     "Remaining credits:",
@@ -84,27 +77,6 @@ chrome.tabs.onUpdated.addListener(
             SOCIAL_SESSION_KEY
           )
         )[SOCIAL_SESSION_KEY];
-      
-      if (!existingSession) {
-        const credits =
-          (
-            await chrome.storage.local.get(
-              "availableCredits"
-            )
-          ).availableCredits ?? 0;
-
-        await chrome.storage.local.set({
-          [SOCIAL_SESSION_KEY]: {
-            domain: tab.url,
-            startTime: Date.now(),
-            creditsAtStart: credits,
-          },
-        });
-      
-        console.log(
-          "Started social session"
-        );
-      }
 
       const credits =
         (
@@ -113,14 +85,53 @@ chrome.tabs.onUpdated.addListener(
           )
         ).availableCredits ?? 0;
 
-        if (credits <= 0) {
-          const blockPageUrl =
-            chrome.runtime.getURL("block.html");
+      if (credits <= 0) {
+        const blockPageUrl =
+          chrome.runtime.getURL("block.html");
+        
+        chrome.tabs.update(tabId, {
+          url: blockPageUrl,
+        });
+        
+        return;
+      }
 
-          chrome.tabs.update(tabId, {
-            url: blockPageUrl,
-          });
-        }
+      if (!existingSession) {
+        await chrome.storage.local.set({
+          [SOCIAL_SESSION_KEY]: {
+            domain: tab.url,
+            startTime: Date.now(),
+            creditsAtStart: credits,
+          },
+        });
+
+        chrome.alarms.create(
+          CREDIT_CHECK_ALARM,
+          {
+            periodInMinutes: 1,
+          }
+        );
+
+        console.log(
+          "Started social session"
+        );
+      }
+
+      // const credits =
+      //   (
+      //     await chrome.storage.local.get(
+      //       "availableCredits"
+      //     )
+      //   ).availableCredits ?? 0;
+
+        // if (credits <= 0) {
+        //   const blockPageUrl =
+        //     chrome.runtime.getURL("block.html");
+
+        //   chrome.tabs.update(tabId, {
+        //     url: blockPageUrl,
+        //   });
+        // }
     }
   }
 );
@@ -147,14 +158,25 @@ chrome.tabs.onActivated.addListener(
           )
         )[SOCIAL_SESSION_KEY];
 
-      if (!existingSession) {
-        const credits =
-          (
-            await chrome.storage.local.get(
-              "availableCredits"
-            )
-          ).availableCredits ?? 0;
+      const credits =
+        (
+          await chrome.storage.local.get(
+            "availableCredits"
+          )
+        ).availableCredits ?? 0;
 
+      if (credits <= 0) {
+        const blockPageUrl =
+          chrome.runtime.getURL("block.html");
+      
+        chrome.tabs.update(tabId, {
+          url: blockPageUrl,
+        });
+      
+        return;
+      }
+
+      if (!existingSession) {
         await chrome.storage.local.set({
           [SOCIAL_SESSION_KEY]: {
             domain: tab.url,
@@ -162,6 +184,13 @@ chrome.tabs.onActivated.addListener(
             creditsAtStart: credits,
           },
         });
+
+        chrome.alarms.create(
+          CREDIT_CHECK_ALARM,
+          {
+            periodInMinutes: 1,
+          }
+        );
 
         console.log(
           "Started social session"
@@ -174,5 +203,84 @@ chrome.tabs.onActivated.addListener(
         "Ended social session"
       );
     }
+  }
+);
+
+chrome.alarms.onAlarm.addListener(
+  async (alarm) => {
+    if (
+      alarm.name !==
+      CREDIT_CHECK_ALARM
+    ) {
+      return;
+    }
+
+    const session =
+      (
+        await chrome.storage.local.get(
+          SOCIAL_SESSION_KEY
+        )
+      )[SOCIAL_SESSION_KEY];
+
+    if (!session) {
+      return;
+    }
+
+    const remainingCredits =
+      getRemainingCredits(session);
+
+    await chrome.storage.local.set({
+      availableCredits:
+        remainingCredits,
+    });
+
+    if (remainingCredits <= 0) {
+      console.log(
+        "Credits exhausted"
+      );
+    
+      await chrome.storage.local.remove(
+        SOCIAL_SESSION_KEY
+      );
+    
+      await chrome.alarms.clear(
+        CREDIT_CHECK_ALARM
+      );
+    
+      const tabs =
+        await chrome.tabs.query({});
+    
+      const blockedTab = tabs.find(
+        (tab) =>
+          tab.url &&
+          BLOCKED_SITES.some((site) =>
+            tab.url!.includes(site)
+          )
+      );
+    
+      if (blockedTab?.id) {
+        const blockPageUrl =
+          chrome.runtime.getURL(
+            "block.html"
+          );
+    
+        chrome.tabs.update(
+          blockedTab.id,
+          {
+            url: blockPageUrl,
+          }
+        );
+      }
+    }
+
+    console.log(
+      "Alarm fired:",
+      alarm.name
+    );
+
+    console.log(
+      "Remaining credits:",
+      remainingCredits
+    );
   }
 );

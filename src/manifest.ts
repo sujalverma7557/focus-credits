@@ -13,7 +13,8 @@ export const manifest: ManifestV3Export = {
   permissions: [
     "storage",
     "tabs",
-    "webNavigation"
+    "webNavigation",
+    "alarms",
   ],
 
   host_permissions: [
